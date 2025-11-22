@@ -1,0 +1,64 @@
+(import "strings" ["split" "atoi"])
+(import "list" ["push" "reduce"])
+(import "math" ["abs"])
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(let input (read_input_file "/Users/olegs/workspace/liss/aoc-2024/day-1/INPUT"))
+; (println "Input:\n" input)
+
+(let lines (strings:split input "\n"))
+(let matcher (re "(\\d+)\\s+(\\d+)"))
+
+(let lists (list:reduce lines (fn [acc line]
+    (let mtch (match matcher line))
+    (let a (get mtch 1))
+    (let b (get mtch 2))
+    [
+        (list:push (get acc 0) (strings:atoi a))
+        (list:push (get acc 1) (strings:atoi b))
+    ]
+) [[] []]))
+
+(let a (list:sort (get lists 0)))
+(let b (list:sort (get lists 1)))
+
+(fn _next [ix acc]
+    (cond (>= ix (len a))
+        acc
+        (_next
+            (+ ix 1)
+            (+ acc (math:abs (- (get a ix) (get b ix))))
+        )
+    )
+)
+
+
+(println "Part 1 Result: " (_next 0 0))
+
+(fn cnt_list [arr]
+    (list:reduce arr (fn [acc x]
+        (cond (has acc x)
+            null
+            (put acc x 0)
+        )
+        (put acc x (+ 1 (get acc x)))
+        acc
+    ) (dict))
+)
+
+
+(let cntb (cnt_list b))
+(let sca (list:reduce a (fn [acc x]
+    (+ acc (cond (has cntb x)
+        (* x (get cntb x))
+        0
+    ))
+) 0))
+
+(println "Part 2 Result: " sca)

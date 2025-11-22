@@ -1,0 +1,97 @@
+(import "strings" ["split" "atoi"])
+(import "list" ["push" "reduce" "map"])
+(import "math" ["abs"])
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(let input (read_input_file "/Users/olegs/workspace/liss/aoc-2024/day-2/INPUT"))
+; (println "Input:\n" input)
+
+(let lines (strings:split input "\n"))
+(let matrix (list:map lines (fn [line]
+    (list:map (strings:split line " ") strings:atoi)
+)))
+; (println matrix)
+
+(fn is_safe1 [nums]
+    (let delta (- (get nums 0) (get nums 1)))
+    (fn _next [ix]
+        (cond (>= ix (len nums))
+            true
+            (
+                (let _dlt (- (get nums (- ix 1)) (get nums ix)))
+                (let _is_safe (cond (> (* delta _dlt) 0)
+                    (and
+                        (>= (math:abs _dlt) 1)
+                        (<= (math:abs _dlt) 3)
+                    )
+                    false
+                ))
+                (cond _is_safe
+                    (_next (+ ix 1))
+                    false
+                )
+            )
+        )
+    )
+    (_next 1)
+)
+
+(let D1 1)
+(let D2 2)
+
+(fn is_safe2 [nums]
+    (fn _next [a b da db pdelta budget]
+        (cond (>= b (len nums))
+            true
+            (
+                (let _pdelta (cond (= pdelta 0) (- (get nums a) (get nums b)) pdelta))
+                (let _delta (- (get nums a) (get nums b)))
+                (let _ok (and
+                    (>= (math:abs _delta) 1)
+                    (<= (math:abs _delta) 3)
+                    (> (* _pdelta _delta) 0)
+                ))
+                (cond _ok
+                    ; cond true
+                    (or
+                        (_next (+ a da) (+ b db) D1 D1 _delta budget)
+                        (cond (> budget 0)
+                            (_next a (+ b 1) D2 D1 pdelta (- budget 1))
+                            false
+                        )
+                    )
+                    ; cond false
+                    (cond (> budget 0)
+                        (_next a (+ b 1) D2 D1 pdelta (- budget 1))
+                        false
+                    )
+                )
+            )
+        )
+    )
+    (or (_next 0 1 D1 D1 0 1)
+        (_next 1 2 D1 D1 0 0)
+    )
+)
+
+(let res1 (list:reduce matrix (fn [acc nums]
+    (+ acc (cond (is_safe1 nums)
+        1
+        0
+    ))
+) 0))
+(println "Part 1 Result: " res1)
+
+(let res2 (list:reduce matrix (fn [acc nums]
+    (+ acc (cond (is_safe2 nums)
+        1
+        0
+    ))
+) 0))
+(println "Part 2 Result: " res2)

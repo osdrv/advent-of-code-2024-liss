@@ -1,0 +1,67 @@
+(import "strings" ["atoi" "match_all"])
+(import "list" ["push" "reduce"])
+(import "math" ["abs"])
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(let input (read_input_file "/Users/olegs/workspace/liss/aoc-2024/day-3/INPUT"))
+
+(let reg (re "mul\\((\\d+),(\\d+)\\)"))
+
+(let mtch (strings:match_all reg input))
+
+(fn _collect1 [acc ix]
+    (cond (>= ix (len mtch))
+        acc
+        (
+            (let _acc (+
+                acc
+                (*
+                    (strings:atoi (get mtch ix))
+                    (strings:atoi (get mtch (+ ix 1)))
+                )
+            ))
+            (_collect1 _acc (+ ix 2))
+        )
+    )
+)
+(let res1 (_collect1 0 1))
+(println "res1: " res1)
+
+(let _mul_re (re "mul\\((\\d+),(\\d+)\\)"))
+(fn _parse_mul [_mul_str]
+    (let _mtch (match _mul_re _mul_str))
+    [(get _mtch 1) (get _mtch 2)]
+)
+
+(let DO "do()")
+(let DONT "don't()")
+
+(let reg2 (re "(do\\(\\)|don't\\(\\)|mul\\(\\d+,\\d+\\))"))
+(let mtch2 (strings:match_all reg2 input))
+
+(let res2 (get (list:reduce (tail mtch2) (fn [acc s]
+    (cond (= s DO)
+        [(get acc 0) true]
+        (cond (= s DONT)
+            [(get acc 0) false]
+            (cond (get acc 1)
+                (
+                    (let _nums_str (_parse_mul s))
+                    (let _nums [
+                        (strings:atoi (get _nums_str 0))
+                        (strings:atoi (get _nums_str 1))
+                    ])
+                    [(+ (get acc 0) (* (get _nums 0) (get _nums 1))) (get acc 1)]
+                )
+                acc
+            )
+        )
+    )
+) [0 true]) 0))
+(println "res2: " res2)

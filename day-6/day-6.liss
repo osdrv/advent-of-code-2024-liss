@@ -1,0 +1,164 @@
+(import "list" ["push" "reduce"])
+(import "strings" ["split"])
+
+(let IS_DEBUG? false)
+
+(let UP 0)
+(let RIGHT 1)
+(let DOWN 2)
+(let LEFT 3)
+
+(let MOVES (dict
+    [UP    [0 -1]]
+    [RIGHT [1  0]]
+    [DOWN  [0  1]]
+    [LEFT  [-1 0]]
+))
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+; -> [ width height ]
+(fn get_field_size [field]
+    [(len (get field 0)) (len field)]
+)
+
+(fn locate_all [field glyph]
+    (let size (get_field_size field))
+    (fn _next [acc x y]
+        (cond (>= y (get size 1))
+            acc
+            (cond (>= x (get size 0))
+                (_next acc 0 (+ y 1))
+                (
+                    (let _glyph (get (get field y) x))
+                    (let _acc (cond (= glyph _glyph)
+                        (list:push acc [x y])
+                        acc
+                    ))
+                    (_next _acc (+ x 1) y)
+                )
+            )
+        )
+    )
+
+    (_next [] 0 0)
+)
+
+(fn get_ix [size pos]
+    (let x (get pos 0))
+    (let y (get pos 1))
+    (+ x (* y (get size 0)))
+)
+
+(fn get_pos [size ix]
+    (let x (% ix (get size 0)))
+    (let y (/ ix (get size 0)))
+    [x y]
+)
+
+(fn visit_all [size start obst_map]
+    (fn _get_next_state [pos dir rot]
+        (cond (>= rot 4)
+            (raise! "I'm spinning at the spot!")
+            (
+                (let _next_dir (% (+ dir rot) 4))
+                (let _next_pos [
+                    (+ (get pos 0) (get (get MOVES _next_dir) 0))
+                    (+ (get pos 1) (get (get MOVES _next_dir) 1))
+                ])
+                (let _next_ix (get_ix size _next_pos))
+                (cond (has? obst_map _next_ix)
+                    (_get_next_state pos dir (+ rot 1))
+                    [_next_pos _next_dir]
+                )
+            )
+        )
+    )
+
+    (fn _next [acc pos dir]
+        (cond (or
+                (>= (get pos 0) (get size 0))
+                (>= (get pos 1) (get size 1))
+                (< (get pos 0) 0)
+                (< (get pos 1) 0)
+            )
+            acc
+            (
+                ; (println "[" (get pos 0) " " (get pos 1) "]")
+                (put acc (get_ix size pos) null)
+                (let _next_state (_get_next_state pos dir 0))
+                (let _next_pos (get _next_state 0))
+                (let _next_dir (get _next_state 1))
+                (let _ix (get_ix size _next_pos))
+                (_next acc _next_pos _next_dir)
+            )
+        )
+    )
+    (_next (dict) start UP)
+)
+
+(fn print_visited [size obst_map vis_map]
+    (fn _next [x y]
+        (cond (>= y (get size 1))
+            null
+            (cond (>= x (get size 0))
+                (
+                    (print "\n")
+                    (_next 0 (+ y 1))
+                )
+                (
+                    (let _ix (get_ix size [x y]))
+                    (let _glyph (cond (has? vis_map _ix)
+                        "X"
+                        (cond (has? obst_map _ix)
+                            "#"
+                            "."
+                        )
+                    ))
+                    (print _glyph)
+                    (_next (+ x 1) y)
+                )
+            )
+        )
+    )
+    (_next 0 0)
+    (print "\n")
+)
+
+((fn main []
+    (let input (read_input_file "INPUT"))
+    (cond IS_DEBUG?
+        (println input)
+        null
+    )   
+    (let lines (strings:split input "\n"))
+    (let size (get_field_size lines))
+    (let obsts (locate_all lines "#"))
+    (let obst_map (list:reduce obsts (fn [acc pos]
+        (put acc (get_ix size pos) null)
+        acc
+    ) (dict)))
+    (let start (get (locate_all lines "^") 0))
+    (cond IS_DEBUG?
+        (
+            (println "obstacles: " obsts)
+            (println "start: " start)
+        )
+        null
+    )
+
+    (let vis_map (visit_all size start obst_map))
+    (cond IS_DEBUG?
+        (
+            (println "vis_map: " vis_map)
+            (print_visited size obst_map vis_map)
+        )
+        null
+    )
+    (println "res1: " (len (keys vis_map)))
+))

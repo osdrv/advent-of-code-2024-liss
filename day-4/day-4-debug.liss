@@ -1,0 +1,89 @@
+(import "strings" ["split"])
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(let input (read_input_file "/Users/olegs/workspace/liss/aoc-2024/day-4/INPUT-TST2"))
+(let MAS "MAS")
+(let lines (strings:split input "\n"))
+
+(fn _find_word [word i di j dj ix]
+    (cond (or (< i 0) (< j 0) (>= i (len lines)) (>= j (len (get lines 0))))
+        0
+        (cond (= (get word ix) (get (get lines i) j))
+            (
+                (cond (= ix (- (len word) 1))
+                    1
+                    (_find_word word (+ i di) di (+ j dj) dj (+ ix 1))
+                )
+            )
+            0
+        )
+    )
+)
+
+(fn _traverse2 [i j]
+    (let _ch (get (get lines i) j))
+    (cond (= _ch (get MAS 0))
+        (cond (or
+                (
+                    (let _v1 (and
+                        (> (_find_word MAS i 1 j 1 0) 0)
+                        (or
+                            (> (_find_word MAS (+ i 2) -1 j 1 0) 0)
+                            (> (_find_word MAS i 1 (+ j 2) -1 0) 0)
+                        )
+                    ))
+                    (println _v1)
+                    _v1
+                )
+                (
+                    (let _v2 (and
+                        (> (_find_word MAS i -1 j 1 0) 0)
+                        (or
+                            (> (_find_word MAS (- i 2) 1 j 1 0) 0)
+                            (> (_find_word MAS i -1 (+ j 2) -1 0) 0)
+                        )
+                    ))
+                    (println _v2)
+                    _v2
+                )
+                (
+                    (let _v3 (and
+                        (> (_find_word MAS i -1 j -1 0) 0)
+                        (or
+                            (> (_find_word MAS (- i 2) 1 j -1 0) 0)
+                            (> (_find_word MAS i -1 (- j 2) 1 0) 0)
+                        )
+                    ))
+                    (println _v3)
+                    _v3
+                )
+                (
+                    (let _v4 (and
+                        (> (_find_word MAS i 1 j -1 0) 0)
+                        (or
+                            (> (_find_word MAS (+ i 2) -1 j -1 0) 0)
+                            (> (_find_word MAS i 1 (- j 2) 1 0) 0)
+                        )
+                    ))
+                    (println _v4)
+                    _v4
+                )
+            )
+            (
+                (println "found a match at i: " i " j: " j)
+                1
+            )
+            0
+        )
+        0
+    )
+)
+(let _res (_traverse2 0 1))
+(breakpoint)
+(println _res)

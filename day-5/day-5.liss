@@ -1,0 +1,114 @@
+(import "strings" ["split" "atoi" "join"])
+(import "list" ["find" "map" "reduce" "sort_fn"])
+
+(let IS_DEBUG? false)
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(fn page_to_dict [page]
+    (fn _next [acc ix]
+        (cond (>= ix (len page))
+            acc
+            (
+                (put acc (get page ix) ix)
+                (_next acc (+ ix 1))
+            )
+        )
+    )
+    (_next (dict) 0)
+)
+
+(fn is_valid_page? [page rules]
+    (let page_d (page_to_dict page))
+    (fn _next_valid [ix]
+        (cond (>= ix (len rules))
+            true
+            (
+                (let rule (get rules ix))
+                (let left (get rule 0))
+                (let right (get rule 1))
+                (let is_valid? (cond (and (has? page_d left) (has? page_d right))
+                    (< (get page_d left) (get page_d right))
+                    true
+                ))
+                (cond is_valid? (_next_valid (+ ix 1)) false)
+            )
+        )
+    )
+    (_next_valid 0)
+)
+
+((fn main []
+    (let input (read_input_file "/Users/olegs/workspace/liss/aoc-2024/day-5/INPUT"))
+    (cond IS_DEBUG?
+        (println input)
+        null
+    )
+    
+    (let lines (strings:split input "\n"))
+    (let break (list:find lines ""))
+    (let rules (list:map (range lines 0 break) (fn [line]
+        (strings:split line "|")
+    )))
+    (cond IS_DEBUG?
+        (println "rules: " rules)
+        null
+    )
+    (let pages (list:map (range lines (+ break 1) (len lines)) (fn [line]
+        (strings:split line ",")
+    )))
+    (cond IS_DEBUG?
+        (println "pages: " pages)
+        null
+    )
+
+    (let res1 (list:reduce pages (fn [acc page]
+        (let is_valid? (is_valid_page? page rules))
+        (+ acc (cond is_valid?
+            (strings:atoi (get page (/ (len page) 2)))
+            0
+        ))
+    ) 0))
+    (println "res1: " res1)
+
+    (let rule_set (list:reduce rules (fn [acc pair]
+        (put acc (strings:join pair "|") null)
+        acc
+    ) (dict)))
+    (cond IS_DEBUG?
+        (println rule_set)
+        null
+    )
+
+    (let res2 (list:reduce pages (fn [acc page]
+        (let is_valid? (is_valid_page? page rules))
+        (cond is_valid?
+            acc
+            (
+                (let page_d (page_to_dict page))
+                (let valid (list:sort_fn page (fn [a b]
+                    (let key (+ a "|" b))
+                    (let inverse_key (+ b "|" a))
+                    (or (has? rule_set key) (not (has? rule_set inverse_key)))
+                )))
+                (cond IS_DEBUG?
+                    (println "valid: " valid)
+                    null
+                )
+                (let el (strings:atoi (get valid (/ (len valid) 2))))
+                (cond IS_DEBUG?
+                    (println "mid elem: " el)
+                    null
+                )
+                (+ acc el)
+            )
+        )
+    ) 0))
+    (println "res2: " res2)
+))
+

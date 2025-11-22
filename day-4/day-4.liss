@@ -1,0 +1,94 @@
+(import "strings" ["atoi" "match_all" "reverse"])
+(import "list" ["push" "reduce"])
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(let input (read_input_file "/Users/olegs/workspace/liss/aoc-2024/day-4/INPUT"))
+(println input)
+
+(let XMAS "XMAS")
+(let MAS "MAS")
+(let RMAS (strings:reverse MAS))
+
+(let lines (strings:split input "\n"))
+(println lines)
+
+(let reduce_2d (fn [arr fun acc]
+    (fn _next [_acc i j]
+        (cond (>= i (len arr))
+            _acc
+            (cond (>= j (len (get arr 0)))
+                (_next _acc (+ i 1) 0)
+                (
+                    (let _nacc (fun _acc i j))
+                    (_next _nacc i (+ j 1))
+                )
+            )
+        )
+    )
+    (_next acc 0 0)
+))
+
+(let STEPS8 [[0 1] [0 -1] [1 0] [-1 0] [1 1] [1 -1] [-1 1] [-1 -1]])
+
+
+(fn _find_word [word i di j dj ix]
+    (cond (or (< i 0) (< j 0) (>= i (len lines)) (>= j (len (get lines 0))))
+        0
+        (cond (= (get word ix) (get (get lines i) j))
+            (
+                (cond (= ix (- (len word) 1))
+                    1
+                    (_find_word word (+ i di) di (+ j dj) dj (+ ix 1))
+                )
+            )
+            0
+        )
+    )
+)
+
+(fn _traverse [i j]
+    (let _ch (get (get lines i) j))
+    (cond (= _ch (get XMAS 0))
+        (list:reduce STEPS8 (fn [acc step]
+            (+ acc (_find_word XMAS i (get step 0) j (get step 1) 0))
+        ) 0)
+        0
+    )
+)
+
+
+(let chars (reduce_2d lines (fn [acc i j]
+    (+ acc (_traverse i j))
+) 0))
+(println "res1: " chars)
+
+(fn _traverse2 [i j]
+    (let _ch (get (get lines i) j))
+    (cond (or (= _ch (head MAS)) (= _ch (head RMAS)))
+        (cond (and
+                (or
+                    (> (_find_word MAS i 1 j 1 0) 0)
+                    (> (_find_word RMAS i 1 j 1 0) 0)
+                )
+                (or
+                    (> (_find_word MAS (+ i 2) -1 j 1 0) 0)
+                    (> (_find_word MAS i 1 (+ j 2) -1 0) 0)
+                )
+            )
+            1
+            0
+        )
+        0
+    )
+)
+
+(let xcnt (reduce_2d lines (fn [acc i j]
+    (+acc (_traverse2 i j))
+) 0))
+(println "res2: " xcnt)
