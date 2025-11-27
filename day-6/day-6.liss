@@ -1,5 +1,6 @@
 (import "list" ["push" "reduce"])
 (import "strings" ["split"])
+(import "math" ["abs"])
 
 (let IS_DEBUG? false)
 
@@ -49,116 +50,219 @@
     (_next [] 0 0)
 )
 
-(fn get_ix [size pos]
-    (let x (get pos 0))
-    (let y (get pos 1))
-    (+ x (* y (get size 0)))
-)
-
-(fn get_pos [size ix]
-    (let x (% ix (get size 0)))
-    (let y (/ ix (get size 0)))
-    [x y]
-)
-
-(fn visit_all [size start obst_map]
-    (fn _get_next_state [pos dir rot]
-        (cond (>= rot 4)
-            (raise! "I'm spinning at the spot!")
-            (
-                (let _next_dir (% (+ dir rot) 4))
-                (let _next_pos [
-                    (+ (get pos 0) (get (get MOVES _next_dir) 0))
-                    (+ (get pos 1) (get (get MOVES _next_dir) 1))
-                ])
-                (let _next_ix (get_ix size _next_pos))
-                (cond (has? obst_map _next_ix)
-                    (_get_next_state pos dir (+ rot 1))
-                    [_next_pos _next_dir]
+(fn prev_lt [arr n]
+    (fn _next [a b]
+        (cond (<= n (get arr a))
+            -1
+            (cond (> n (get arr b))
+                b
+                (cond (<= (- b a) 1)
+                    (cond (<= n (get arr b))
+                        a
+                        -1
+                    )
+                    (
+                        (let mid (/ (+ a b) 2))
+                        (cond (> n (get arr mid))
+                            (_next mid b)
+                            (_next a mid)
+                        )
+                    )
                 )
             )
         )
     )
+    (cond (is_empty? arr)
+        -1
+        (_next 0 (- (len arr) 1))
+    )
+)
 
-    (fn _next [acc pos dir]
-        (cond (or
-                (>= (get pos 0) (get size 0))
-                (>= (get pos 1) (get size 1))
-                (< (get pos 0) 0)
-                (< (get pos 1) 0)
+(fn next_gt [arr n]
+    (fn _next [a b]
+        (cond (>= n (get arr b))
+            -1
+            (cond (< n (get arr a))
+                a
+                (cond (<= (- b a) 1)
+                    (cond (>= n (get arr a))
+                        b
+                        -1
+                    )
+                    (
+                        (let mid (/ (+ a b) 2))
+                        (cond (< n (get arr mid))
+                            (_next a mid)
+                            (_next mid b)
+                        )
+                    )
+                )
             )
+        )
+    )
+    (cond (is_empty? arr)
+        -1
+        (_next 0 (- (len arr) 1))
+    )
+)
+
+(fn mk_obst_map [lines]
+    (let size (get_field_size lines))
+    (let obsts (locate_all lines "#"))
+    (fn _next [acc ix]
+        (cond (>= ix (len obsts))
             acc
             (
-                ; (println "[" (get pos 0) " " (get pos 1) "]")
-                (put acc (get_ix size pos) null)
-                (let _next_state (_get_next_state pos dir 0))
-                (let _next_pos (get _next_state 0))
-                (let _next_dir (get _next_state 1))
-                (let _ix (get_ix size _next_pos))
-                (_next acc _next_pos _next_dir)
+                (let x (get (get obsts ix) 0))
+                (let y (get (get obsts ix) 1))
+                (let vert (get acc 0))
+                (let hor (get acc 1))
+                (put vert x (list:push (get vert x) y))
+                (put hor y (list:push (get hor y) x))
+                (_next [vert hor] (+ ix 1))
             )
         )
     )
-    (_next (dict) start UP)
+    ; [vert hor]
+    (_next [(* [[]] (get size 0)) (* [[]] (get size 1))] 0)
 )
 
-(fn print_visited [size obst_map vis_map]
-    (fn _next [x y]
-        (cond (>= y (get size 1))
-            null
-            (cond (>= x (get size 0))
-                (
-                    (print "\n")
-                    (_next 0 (+ y 1))
-                )
-                (
-                    (let _ix (get_ix size [x y]))
-                    (let _glyph (cond (has? vis_map _ix)
-                        "X"
-                        (cond (has? obst_map _ix)
-                            "#"
-                            "."
+(fn move_next [x0 y0 x1 y1]
+    (let x2 (switch 
+        [(is_null? x1) null ]
+        [(= x0 x1) x0]
+        [(< x0 x1) (- x1 1)]
+        [(> x0 x1) (+ x1 1)]
+    ))
+    (let y2 (switch 
+        [(is_null? y1) null ]
+        [(= y0 y1) y0]
+        [(< y0 y1) (- y1 1)]
+        [(> y0 y1) (+ y1 1)]
+    ))
+    [x2 y2]
+)
+
+(fn goes_out? [move]
+    (or
+        (is_null? (get move 0))
+        (is_null? (get move 1))
+    )
+)
+
+; [dist, has_loop]
+(fn traverse [lines start sdir verts hors]
+    (let size (get_field_size lines))
+    (fn _next [acc x y dir]
+        (let pos_key (+ x (* 1000 y) (* 1000000 dir)))
+        (cond IS_DEBUG? (println "visiting x=" x " y=" y " dir=" dir " pos key: " pos_key))
+        (cond (has? acc pos_key)
+            [acc true]
+            (
+                (put acc pos_key null)
+                (switch dir
+                    [UP (
+                        (let _nm1 (move_next x y x (get (get verts x) (prev_lt (get verts x) y))))
+                        (cond IS_DEBUG? (println "next move: " _nm1))
+                        (cond (goes_out? _nm1)
+                            [acc false]
+                            (_next acc (get _nm1 0) (get _nm1 1) RIGHT)
                         )
-                    ))
-                    (print _glyph)
-                    (_next (+ x 1) y)
+                    )]
+                    [DOWN (
+                        (let _nm2 (move_next x y x (get (get verts x) (next_gt (get verts x) y))))
+                        (cond IS_DEBUG? (println "next move: " _nm2))
+                        (cond (goes_out? _nm2)
+                            [acc false]
+                            (_next acc (get _nm2 0) (get _nm2 1) LEFT)
+                        )
+                    )]
+                    [RIGHT (
+                        (let _nm3 (move_next x y (get (get hors y) (next_gt (get hors y) x)) y))
+                        (cond IS_DEBUG? (println "next move: " _nm3))
+                        (cond (goes_out? _nm3)
+                            [acc false]
+                            (_next acc (get _nm3 0) (get _nm3 1) DOWN)
+                        )
+                    )]
+                    [LEFT (
+                        (let _nm4 (move_next x y (get (get hors y) (prev_lt (get hors y) x)) y))
+                        (cond IS_DEBUG? (println "next move: " _nm4))
+                        (cond (goes_out? _nm4)
+                            [acc false]
+                            (_next acc (get _nm4 0) (get _nm4 1) UP)
+                        )
+                    )]
                 )
             )
         )
     )
-    (_next 0 0)
-    (print "\n")
+    ; 1 because we should collect the starting point
+    (_next (dict) (get start 0) (get start 1) sdir)
+)
+
+(fn traverse_with_obst [lines start sdir verts hors obst_x obst_y]
+    (let old_vert (get verts obst_x))
+    (let old_hor (get hors obst_y))
+
+    (let is_debug (and (= obst_x 5) (= obst_y 0)))
+
+    (cond is_debug
+        (
+            (println "===============================")
+            (println "visiting point x:" obst_x " y:" obst_y)
+            (println "input verts=" verts " hors=" hors)
+        )
+    )
+
+    (let new_vert (list:sort (list:push old_vert obst_y)))
+    (let new_hor (list:sort (list:push old_hor obst_x)))
+
+    (put verts obst_x new_vert)
+    (put hors obst_y new_hor)
+
+    (cond is_debug (println "new verts=" verts " new hors=" hors))
+
+    (let res (traverse lines start sdir verts hors))
+
+    (put verts obst_x old_vert)
+    (put hors obst_y old_hor)
+    (cond is_debug (println "recovered verts=" verts " hors=" hors))
+    (cond is_debug (println (get res 0)))
+
+    (cond (get res 1) 1 0)
 )
 
 ((fn main []
     (let input (read_input_file "INPUT"))
-    (cond IS_DEBUG?
-        (println input)
-        null
-    )   
+    (cond IS_DEBUG? (println input))
     (let lines (strings:split input "\n"))
     (let size (get_field_size lines))
-    (let obsts (locate_all lines "#"))
-    (let obst_map (list:reduce obsts (fn [acc pos]
-        (put acc (get_ix size pos) null)
-        acc
-    ) (dict)))
+    (let obst_map (mk_obst_map lines))
+    (cond IS_DEBUG? (println obst_map))
     (let start (get (locate_all lines "^") 0))
-    (cond IS_DEBUG?
-        (
-            (println "obstacles: " obsts)
-            (println "start: " start)
-        )
-        null
-    )
+    (println "start: " start)
+    (let res1 (traverse lines start UP (get obst_map 0) (get obst_map 1)))
+    (println "res1=" res1)
 
-    (let vis_map (visit_all size start obst_map))
-    (cond IS_DEBUG?
-        (
-            (println "vis_map: " vis_map)
-            (print_visited size obst_map vis_map)
+    (let verts (get obst_map 0))
+    (let hors (get obst_map 1))
+
+    (fn _next [acc x y]
+        (cond (>= y (get size 1))
+            acc
+            (cond (>= x (get size 0))
+                (_next acc 0 (+ y 1))
+                (
+                    (let _acc (cond (= (get (get lines y) x) ".")
+                        (+ acc (traverse_with_obst lines start UP verts hors x y))
+                        acc
+                    ))
+                    (_next _acc (+ x 1) y)
+                )
+            )
         )
-        null
     )
-    (println "res1: " (len (keys vis_map)))
+    (let res2 (_next 0 0 0))
+    (println "res2=" res2)
 ))
