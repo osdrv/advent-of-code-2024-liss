@@ -1,6 +1,7 @@
-(import "list" ["push" "reduce"])
+(import "list" ["push" "reduce" "quicksort_mut" "SORT_ASC"])
 (import "strings" ["split"])
 (import "math" ["abs"])
+(import "test_utils" ["benchmark"] as tu)
 
 (let IS_DEBUG? false)
 
@@ -150,14 +151,77 @@
     )
 )
 
+(fn mk_key2 [x y]
+    (+ x (* 1000 y))
+)
+
+(fn mk_key3 [x y dir]
+    (+ x (* 1000 y) (* 1000000 dir))
+)
+
+(fn traverse_step [lines start sdir]
+    (let obsts (locate_all lines "#"))
+    (let size (get_field_size lines))
+    (let obst_map (list:reduce obsts (fn [acc obst]
+        (put acc (mk_key2 (get obst 0) (get obst 1)) null)
+        acc
+    ) (dict)))
+    (fn _inbound [x y]
+        (and (>= x 0) (>= y 0) (< x (get size 0)) (< y (get size 1)))
+    )
+    (fn _next [acc x y dir]
+        (cond (_inbound x y)
+            (
+                (put acc (mk_key2 x y) null)
+                (let mv (get MOVES dir))
+                (let nx (+ x (get mv 0)))
+                (let ny (+ y (get mv 1)))
+                (cond (_inbound nx ny)
+                    (cond (= (get (get lines ny) nx) "#")
+                        (_next acc x y (% (+ dir 1) 4))
+                        (_next acc nx ny dir)
+                    )
+                    (_next acc nx ny dir)
+                )
+            )
+            acc
+        )
+    )
+    (let visited (_next (dict) (get start 0) (get start 1) sdir))
+
+    (fn _print_field [x y]
+        (cond (< y (get size 1))
+            (cond (>= x (get size 0))
+                (
+                    (print "\n")
+                    (_print_field 0 (+ y 1))
+                )
+                (
+                    (let k (mk_key2 x y))
+                    (let glyph (switch
+                        [(has? visited k) "X"]
+                        [(has? obst_map k) "#"]
+                        [* "."]
+                    ))
+                    (print glyph)
+                    (_print_field (+ x 1) y)
+                )
+            )
+        )
+    )
+    (_print_field 0 0)
+
+    (len (keys visited))
+)
+
 ; [dist, has_loop]
-(fn traverse [lines start sdir verts hors]
+(fn traverse_jump [lines start sdir verts hors]
     (let size (get_field_size lines))
     (fn _next [acc x y dir]
-        (let pos_key (+ x (* 1000 y) (* 1000000 dir)))
+        (let pos_key (mk_key3 x y dir))
         (cond IS_DEBUG? (println "visiting x=" x " y=" y " dir=" dir " pos key: " pos_key))
         (cond (has? acc pos_key)
-            [acc true]
+            true
             (
                 (put acc pos_key null)
                 (switch dir
@@ -165,7 +229,7 @@
                         (let _nm1 (move_next x y x (get (get verts x) (prev_lt (get verts x) y))))
                         (cond IS_DEBUG? (println "next move: " _nm1))
                         (cond (goes_out? _nm1)
-                            [acc false]
+                            false
                             (_next acc (get _nm1 0) (get _nm1 1) RIGHT)
                         )
                     )]
@@ -173,7 +237,7 @@
                         (let _nm2 (move_next x y x (get (get verts x) (next_gt (get verts x) y))))
                         (cond IS_DEBUG? (println "next move: " _nm2))
                         (cond (goes_out? _nm2)
-                            [acc false]
+                            false
                             (_next acc (get _nm2 0) (get _nm2 1) LEFT)
                         )
                     )]
@@ -181,7 +245,7 @@
                         (let _nm3 (move_next x y (get (get hors y) (next_gt (get hors y) x)) y))
                         (cond IS_DEBUG? (println "next move: " _nm3))
                         (cond (goes_out? _nm3)
-                            [acc false]
+                            false
                             (_next acc (get _nm3 0) (get _nm3 1) DOWN)
                         )
                     )]
@@ -189,7 +253,7 @@
                         (let _nm4 (move_next x y (get (get hors y) (prev_lt (get hors y) x)) y))
                         (cond IS_DEBUG? (println "next move: " _nm4))
                         (cond (goes_out? _nm4)
-                            [acc false]
+                            false
                             (_next acc (get _nm4 0) (get _nm4 1) UP)
                         )
                     )]
@@ -202,12 +266,10 @@
 )
 
 (fn traverse_with_obst [lines start sdir verts hors obst_x obst_y]
-    (let old_vert (get verts obst_x))
-    (let old_hor (get hors obst_y))
+    (let old_vert (list:copy (get verts obst_x)))
+    (let old_hor (list:copy (get hors obst_y)))
 
-    (let is_debug (and (= obst_x 5) (= obst_y 0)))
-
-    (cond is_debug
+    (cond IS_DEBUG?
         (
             (println "===============================")
             (println "visiting point x:" obst_x " y:" obst_y)
@@ -215,34 +277,33 @@
         )
     )
 
-    (let new_vert (list:sort (list:push old_vert obst_y)))
-    (let new_hor (list:sort (list:push old_hor obst_x)))
+    (let new_vert (list:quicksort_fn_mut (list:push old_vert obst_y) list:SORT_ASC))
+    (let new_hor  (list:quicksort_fn_mut (list:push old_hor  obst_x) list:SORT_ASC))
 
     (put verts obst_x new_vert)
     (put hors obst_y new_hor)
 
-    (cond is_debug (println "new verts=" verts " new hors=" hors))
+    (cond IS_DEBUG? (println "new verts=" verts " new hors=" hors))
 
-    (let res (traverse lines start sdir verts hors))
+    (let res (tu:benchmark "traverse_jump" (fn [] (traverse_jump lines start sdir verts hors))))
 
     (put verts obst_x old_vert)
     (put hors obst_y old_hor)
-    (cond is_debug (println "recovered verts=" verts " hors=" hors))
-    (cond is_debug (println (get res 0)))
+    (cond IS_DEBUG? (println "recovered verts=" verts " hors=" hors))
 
-    (cond (get res 1) 1 0)
+    (cond res 1 0)
 )
 
 ((fn main []
     (let input (read_input_file "INPUT"))
-    (cond IS_DEBUG? (println input))
     (let lines (strings:split input "\n"))
     (let size (get_field_size lines))
     (let obst_map (mk_obst_map lines))
-    (cond IS_DEBUG? (println obst_map))
+
     (let start (get (locate_all lines "^") 0))
     (println "start: " start)
-    (let res1 (traverse lines start UP (get obst_map 0) (get obst_map 1)))
+
+    (let res1 (traverse_step lines start UP))
     (println "res1=" res1)
 
     (let verts (get obst_map 0))
@@ -255,7 +316,7 @@
                 (_next acc 0 (+ y 1))
                 (
                     (let _acc (cond (= (get (get lines y) x) ".")
-                        (+ acc (traverse_with_obst lines start UP verts hors x y))
+                        (+ acc (tu:benchmark "traverse_with_obst" (fn [] (traverse_with_obst lines start UP verts hors x y))))
                         acc
                     ))
                     (_next _acc (+ x 1) y)
