@@ -1,0 +1,64 @@
+(import "strings" ["split" "atoi"])
+(import "list" ["find" "map" "reduce"])
+
+(let IS_DEBUG? true)
+
+(let PLUS   1)
+(let MULT   1)
+(let CONCAT 1)
+
+(fn read_input_file [src]
+    (let f (fopen src))
+    (let data (fread_all f))
+    (fclose f)
+    data
+)
+
+(fn concat [a b]
+    (fn _next [acc]
+        (cond (> acc b)
+            (+ (* a acc) b)
+            (_next (* acc 10))
+        )
+    )
+    (_next 1)
+)
+
+(fn can_eq [sum nums ops]
+    (fn _next [acc ix]
+        (cond (>= ix (len nums))
+            (= acc sum)
+            (or
+                (cond (> ops 0) (_next (+ acc (get nums ix)) (+ ix 1)) false)
+                (cond (> ops 1) (_next (* acc (get nums ix)) (+ ix 1)) false)
+                (cond (> ops 2) (_next (concat acc (get nums ix)) (+ ix 1)) false)
+            )
+        )
+    )
+    (_next 0 0)
+)
+
+((fn main []
+    (let input (read_input_file "INPUT"))
+    (cond IS_DEBUG?
+        (println input)
+        null
+    )
+    (let lines (strings:split input "\n"))
+    (let data (list:reduce lines (fn [acc line]
+        (let _chunks (strings:split line " "))
+        (let checksum (strings:atoi (strings:trim_suffix (head _chunks) ":")))
+        (let nums (list:map (tail _chunks) strings:atoi))
+        (list:push acc [checksum nums])
+    ) []))
+
+    (cond IS_DEBUG? (println data))
+
+    (println "res1=" (list:reduce data (fn [acc entry]
+        (+ acc (cond (can_eq (head entry) (last entry) (+ PLUS MULT)) (head entry) 0))
+    ) 0))
+
+    (println "res2=" (list:reduce data (fn [acc entry]
+        (+ acc (cond (can_eq (head entry) (last entry) (+ PLUS MULT CONCAT)) (head entry) 0))
+    ) 0))
+))
