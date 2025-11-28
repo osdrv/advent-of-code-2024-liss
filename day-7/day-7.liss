@@ -1,7 +1,7 @@
 (import "strings" ["split" "atoi"])
-(import "list" ["find" "map" "reduce"])
+(import "list" ["map" "reduce"])
 
-(let IS_DEBUG? true)
+(let IS_DEBUG? false)
 
 (let PLUS   1)
 (let MULT   1)
