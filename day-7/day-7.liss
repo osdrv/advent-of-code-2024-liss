@@ -54,11 +54,16 @@
 
     (cond IS_DEBUG? (println data))
 
-    (println "res1=" (list:reduce data (fn [acc entry]
-        (+ acc (cond (can_eq (head entry) (last entry) (+ PLUS MULT)) (head entry) 0))
-    ) 0))
+    (let res (list:reduce data (fn [acc entry]
+        (cond (can_eq (head entry) (last entry) (+ PLUS MULT))
+            [(+ (get acc 0) (head entry)) (+ (get acc 1) (head entry))]
+            (cond (can_eq (head entry) (last entry) (+ PLUS MULT CONCAT))
+                [(get acc 0) (+ (get acc 1) (head entry))]
+                acc
+            )
+        )
+    ) [0 0]))
 
-    (println "res2=" (list:reduce data (fn [acc entry]
-        (+ acc (cond (can_eq (head entry) (last entry) (+ PLUS MULT CONCAT)) (head entry) 0))
-    ) 0))
+    (println "res1=" (get res 0))
+    (println "res2=" (get res 1))
 ))
